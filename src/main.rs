@@ -1,5 +1,7 @@
 use argh::FromArgs;
 use std::process::Command;
+use std::process;
+use regex::Regex;
 
 #[derive(FromArgs)]
 /// オプション
@@ -12,8 +14,26 @@ pub struct Options {
 fn main() {
     let options: Options = argh::from_env();
 
-    let output = Command::new("git").arg("remote").arg("--version").output().expect("failed to run. `git remote`");
-    println!("{}", String::from_utf8_lossy(&output.stdout));
+    let git_remote_url_cmd = Command::new("git").arg("remote").arg("-v").output().expect("failed to run. `git remote`");
+    
+    if String::from_utf8(git_remote_url_cmd.stderr).unwrap() != "" {
+        eprintln!("not a git repo");
+		process::exit(1);
+    }
+
+    let git_remote_url = String::from_utf8(git_remote_url_cmd.stdout).unwrap();
+    let re = Regex::new(r"github.com:(.*).git").unwrap();
+    let git_remote_url_caps = re.captures(&git_remote_url).unwrap();
+
+    let current_branch_cmd = Command::new("git").arg("branch").arg("--contains").output().expect("failed to run. `git branch --contains`");
+    let current_branch = String::from_utf8(current_branch_cmd.stdout).unwrap();
+    let re = Regex::new(r"\* (.*)").unwrap();
+    let current_branch_caps = re.captures(&current_branch).unwrap();
+
+    let url = "https://github.com/".to_string() + &git_remote_url_caps[1] + "/compare/develop..." + &current_branch_caps[1];
+    println!("{}", url);
+    
+    // println!("{}", &caps[1]);
 
     // 引数を受け取る
     // 現在いるディレクトリが gitリポジトリかどうかチェック
