@@ -11,7 +11,17 @@ pub struct Options {
     pull_request: bool,
 }
 
-fn main() {
+async fn get_http(url: &str) -> reqwest::StatusCode {
+    let body = reqwest::get(url).await.unwrap_or_else(|err| {
+        eprintln!("Error: {}", err);
+        process::exit(1);
+    }).status();
+
+    body
+}
+
+#[tokio::main]
+async fn main() {
     let options: Options = argh::from_env();
 
     let git_remote_url_cmd = Command::new("git").arg("remote").arg("-v").output().expect("failed to run. `git remote`");
@@ -30,25 +40,21 @@ fn main() {
     let re = Regex::new(r"\* (.*)").unwrap();
     let current_branch_caps = re.captures(&current_branch).unwrap();
 
-    let url = "https://github.com/".to_string() + &git_remote_url_caps[1] + "/compare/develop..." + &current_branch_caps[1];
-    println!("{}", url);
-    
-    // println!("{}", &caps[1]);
+    if options.pull_request {
+        let url = "https://github.com/".to_string() + &git_remote_url_caps[1] + "/compare/develop..." + &current_branch_caps[1];
+        open::that(url).unwrap();
+        process::exit(0);
+    }
 
-    // 引数を受け取る
-    // 現在いるディレクトリが gitリポジトリかどうかチェック
-        // gitリポジトリじゃなければ、違う旨を表示して終了
-        // gitリポジトリなら、次へ
-    // git remote をとってくる
-        // git remote -v
-            // origin  git@github.com:timeleap-rura/rura-platform-web.git (fetch)
-            // origin  git@github.com:timeleap-rura/rura-platform-web.git (push)
-        // grep fetch
-    // 現在いるブランチをとってくる（git command を実行）
-    // 受け取った引数に基づいて URL を生成する
-        // -p が有効なら
-            // PR作成ページのURLを生成
-        // -p が無効なら
-            // ブランチのページのURLを生成
-    println!("{:?}", options.pull_request);
+    let base_url = "https://github.com/".to_string() + &git_remote_url_caps[1];
+    // let url = base_url + "/tree/" + &current_branch_caps[1];
+    let url = base_url + "/tree/" + &current_branch_caps[1];
+
+    let status = get_http(&url).await == 404;
+    if status {
+        open::that("https://github.com/".to_string() + &git_remote_url_caps[1]).unwrap();
+        process::exit(0);
+    }
+
+    open::that(url).unwrap();
 }
