@@ -6,9 +6,13 @@ use regex::Regex;
 #[derive(FromArgs)]
 /// オプション
 pub struct Options {
-    /// create pull request?
+    /// create pull request, what branch?
     #[argh(switch, short = 'p')]
     pull_request: bool,
+
+    /// specify base branch
+    #[argh(option, short = 'b', default = "String::from(\"main\")")]
+    base_branch: String
 }
 
 async fn get_http(url: &str) -> reqwest::StatusCode {
@@ -41,7 +45,8 @@ async fn main() {
     let current_branch_caps = re.captures(&current_branch).unwrap();
 
     if options.pull_request {
-        let url = "https://github.com/".to_string() + &git_remote_url_caps[1] + "/compare/develop..." + &current_branch_caps[1];
+        let branch_name = options.base_branch;
+        let url = "https://github.com/".to_string() + &git_remote_url_caps[1] + "/compare/" + &branch_name + "..." + &current_branch_caps[1];
         open::that(url).unwrap();
         process::exit(0);
     }
